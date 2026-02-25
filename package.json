@@ -1,0 +1,23 @@
+{
+  "name": "dati-prototype",
+  "version": "1.0.0",
+  "description": "D.A.T.I. [Don't Ask The Internet] — Trivia App Backend Prototype",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "db:init": "mysql -u root -p < db/schema.sql && mysql -u root -p < db/seed.sql",
+    "db:reset": "mysql -u root -p -e 'DROP DATABASE IF EXISTS dati_trivia;' && npm run db:init"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
