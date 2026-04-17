@@ -22,3 +22,22 @@ Running log of issues noticed in passing that are **not** in scope for the curre
 - **Noticed:** 2026-04-17, during Phase 1 step 5 (`npm install socket.io`)
 - **What:** `npm install` reported `7 vulnerabilities (1 moderate, 6 high)`. These are not caused by socket.io — the count was the same before and after the install, so they're all in existing transitive deps (likely bcrypt / mysql2 / express chain).
 - **Fix (later):** Run `npm audit` to enumerate each CVE, decide per-item whether `npm audit fix` is safe or whether a major version bump is needed. Do not run `npm audit fix --force` blindly — it can pin breaking major versions.
+
+---
+
+## Logging
+
+### serve-static URIError noise from path-traversal probes
+- **Noticed:** 2026-04-17, during Phase 1 step 9 (reviewing `pm2 logs dati` after deploy)
+- **Where:** `/home/elijah/.pm2/logs/dati-error.log` on the droplet
+- **What:** Attackers probe the public URL with URL-encoded path-traversal patterns like `/%c0` and `/%c0/`. Express's `serve-static` correctly rejects them with `URIError: Failed to decode param '/%c0'`, but each rejection produces a ~10-line stack trace in the error log. Over 51+ days of uptime the log has accumulated many of these, making real errors harder to spot during post-incident review.
+- **Sample:** `URIError: Failed to decode param '/%c0' at decodeURIComponent ... at serveStatic (…/node_modules/serve-static/index.js:125:12)`
+- **Risk:** Cosmetic only — the probes aren't succeeding, the server is behaving correctly. The concern is signal-to-noise in the error log.
+- **Fix (later):** Add a small Express error-handling middleware that catches `URIError` specifically and responds 400 without logging the stack:
+  ```js
+  app.use((err, req, res, next) => {
+      if (err instanceof URIError) return res.status(400).send('Bad Request');
+      next(err);
+  });
+  ```
+  Pairs naturally with the log-rotation work already planned for Phase 7 production hardening.
