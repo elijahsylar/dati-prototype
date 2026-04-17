@@ -428,6 +428,12 @@ function connectSocket() {
     socket.on('connect', () => {
         setFooter('Connected. Watching event ' + selectedEvent.id + '.', false);
         socket.emit('host:watch_event', { event_id: selectedEvent.id });
+        // Fetch snapshot state in parallel with the emit. Closes the race where
+        // players joined (or scored) before the host connected — broadcasts are
+        // fire-and-forget, so anyone not in the room at emit time never sees them.
+        // Any live broadcast arriving during this fetch window is de-duped by
+        // the existing Map.set in onTeamJoined / onScoresUpdate (idempotent by id).
+        loadSnapshots(selectedEvent.id).catch(err => console.warn('snapshot load failed:', err));
     });
     socket.on('connect_error', (err) => {
         setFooter('Connection refused: ' + err.message + '. Try logging in again.', true);
@@ -458,6 +464,32 @@ function doResume() { socket && socket.emit('host:resume_event',  { event_id: se
 function doEnd() {
     if (!confirm('End this event now? Scores are final; teams will see the leaderboard and the game will close.')) return;
     socket && socket.emit('host:end_event', { event_id: selectedEvent.id });
+}
+
+// --- snapshot fetch on connect (closes broadcast-only-no-snapshot race) ---
+async function loadSnapshots(eventId) {
+    const headers = { 'Authorization': 'Bearer ' + token };
+    const [teamsRes, scoresRes] = await Promise.all([
+        fetch('/api/events/' + eventId + '/teams',  { headers }),
+        fetch('/api/events/' + eventId + '/scores', { headers }),
+    ]);
+    if (teamsRes.ok) {
+        const list = await teamsRes.json();
+        list.forEach(t => {
+            // Map.set is idempotent by key — if a live broadcast already
+            // populated this team_id during the race, we just refresh it.
+            teams.set(t.team_id, { team_name: t.team_name, member_count: t.member_count });
+            if (!scoresMap.has(t.team_id)) {
+                scoresMap.set(t.team_id, { team_name: t.team_name, points: 0, last_answer_correct: null });
+            }
+        });
+        renderRoster();
+    }
+    if (scoresRes.ok) {
+        const list = await scoresRes.json();
+        list.forEach(s => scoresMap.set(s.team_id, s));
+        renderLeaderboard();
+    }
 }
 
 // --- inbound handlers ---

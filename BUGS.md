@@ -41,3 +41,15 @@ Running log of issues noticed in passing that are **not** in scope for the curre
   });
   ```
   Pairs naturally with the log-rotation work already planned for Phase 7 production hardening.
+
+---
+
+## Architecture
+
+### Broadcast-only state: audit for other latent "host connects late" bugs
+- **Noticed:** 2026-04-17, Phase 2 — host console showed `Teams (0)` while server-side the event had 1 team and a player was mid-game. Root cause: `/host.html` populated its roster solely from live `lobby:team_joined` broadcasts. A player who joined before the host connected was invisible to the host because broadcasts are fire-and-forget — no snapshot mechanism.
+- **Fix shipped in Phase 2.1:** new `GET /api/events/:id/teams` and `GET /api/events/:id/scores` REST endpoints; `/host.html` fetches both alongside its `host:watch_event` emit.
+- **Class of bug to audit:** anywhere state is derived solely from socket broadcasts without an accompanying snapshot lookup. Known candidates:
+  - **Timer recovery on host page reload.** `question_started_at` lives in `event_state`, but `/host.html` has no flow to rehydrate "current question + time remaining" on a fresh page load into a live event. A host refresh mid-question currently shows a dead timer. Phase 7 hardening — needs the same snapshot treatment as teams/scores, probably via an extended `GET /api/events/:id/live-state` that returns current question index, question body, and server-wall-clock timestamp for started_at so the client can compute `remaining = time_limit - (now - started_at)`.
+  - **Lifeline state on player rejoin.** `teams.lifeline_used` isn't surfaced in the `team:rejoin` ack. A player who used their lifeline, then reloaded, would see the UI as if they still had it. Phase 5 work when the full lifeline UI lands.
+- **General principle to enforce:** every broadcast event should have a paired "snapshot on load" REST endpoint (or inclusion in an existing one), so any late-joiner can converge to current truth without waiting for the next broadcast.

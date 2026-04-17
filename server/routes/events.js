@@ -303,6 +303,85 @@ router.get('/:id/print-card.html', auth, async (req, res) => {
     }
 });
 
+// GET /api/events/:id/teams — admin snapshot of teams registered to an event.
+// Exists so /host.html can populate its roster on load/reload instead of
+// relying only on live lobby:team_joined broadcasts. Closes the race where
+// a host connects after players have already joined and never sees them.
+// Ordered by joined_at ASC so first-join-first-displayed.
+router.get('/:id/teams', auth, async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id AS team_id, team_name, member_count, lifeline_used, joined_at
+               FROM teams
+              WHERE event_id = ?
+              ORDER BY joined_at ASC, id ASC`,
+            [req.params.id]
+        );
+        res.json(rows.map(r => ({
+            team_id: r.team_id,
+            team_name: r.team_name,
+            member_count: r.member_count,
+            lifeline_used: !!r.lifeline_used,
+            joined_at: r.joined_at,
+        })));
+    } catch (err) {
+        console.error('Get teams error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// GET /api/events/:id/scores — admin snapshot of cumulative scores.
+// Payload shape matches the scores:update socket broadcast exactly so
+// /host.html can reuse its existing render function. last_answer_correct
+// reflects the current/most-recent question on event_state; null means
+// "no question yet" or "this team didn't submit for the current question".
+router.get('/:id/scores', auth, async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const [evRows] = await pool.query('SELECT id FROM events WHERE id = ?', [eventId]);
+        if (evRows.length === 0) return res.status(404).json({ error: 'Event not found' });
+
+        const [scoreRows] = await pool.query(
+            `SELECT t.id AS team_id, t.team_name,
+                    COALESCE(SUM(ta.points_earned), 0) AS points
+               FROM teams t
+               LEFT JOIN team_answers ta ON ta.team_id = t.id
+              WHERE t.event_id = ?
+              GROUP BY t.id, t.team_name
+              ORDER BY points DESC, t.id ASC`,
+            [eventId]
+        );
+
+        const [stateRows] = await pool.query(
+            'SELECT current_question_id FROM event_state WHERE event_id = ?',
+            [eventId]
+        );
+        const currentQid = stateRows.length > 0 ? stateRows[0].current_question_id : null;
+
+        let correctMap = new Map();
+        if (currentQid) {
+            const [answers] = await pool.query(
+                `SELECT ta.team_id, (ta.points_earned > 0) AS correct
+                   FROM team_answers ta
+                   JOIN teams t ON t.id = ta.team_id
+                  WHERE ta.question_id = ? AND t.event_id = ?`,
+                [currentQid, eventId]
+            );
+            correctMap = new Map(answers.map(r => [r.team_id, !!r.correct]));
+        }
+
+        res.json(scoreRows.map(r => ({
+            team_id: r.team_id,
+            team_name: r.team_name,
+            points: Number(r.points),
+            last_answer_correct: correctMap.has(r.team_id) ? correctMap.get(r.team_id) : null,
+        })));
+    } catch (err) {
+        console.error('Get scores error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // GET /api/events/:id/qr-code.png — PNG QR code for the event's join URL.
 // JWT-auth (admin). Returns 404 if the event has no join_code (draft/cancelled
 // without a prior publish). 400x400, high error correction, no-cache so hosts
