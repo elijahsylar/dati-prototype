@@ -19,6 +19,7 @@ app.use('/api/auth',      require('./routes/auth'));
 app.use('/api/themes',    require('./routes/themes'));
 app.use('/api/questions',  require('./routes/questions'));
 app.use('/api/events',    require('./routes/events'));
+app.use('/api/join',      require('./routes/join'));
 
 // Health check
 app.get('/api/health', async (req, res) => {

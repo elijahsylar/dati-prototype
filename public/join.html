@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>D.A.T.I. — Join Game</title>
+    <link rel="stylesheet" href="/css/admin.css">
+    <style>
+        html, body { height: 100%; }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--navy) 0%, #0F1F3B 100%);
+            padding: 20px;
+            margin: 0;
+        }
+        .join-card {
+            background: white;
+            padding: 40px 28px;
+            border-radius: 16px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.30);
+        }
+        .brand { text-align: center; margin-bottom: 24px; }
+        .brand-mark {
+            color: var(--navy);
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin: 0;
+        }
+        .brand-mark span { color: var(--gold); }
+        .brand-sub {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+        .prompt {
+            text-align: center;
+            color: var(--text);
+            font-size: 15px;
+            margin: 0 0 18px;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* ---- Screen 1: code entry ---- */
+        .code-input {
+            display: block;
+            width: 100%;
+            font-size: 38px;
+            font-weight: 700;
+            font-family: 'SF Mono', Menlo, Consolas, monospace;
+            text-align: center;
+            letter-spacing: 10px;
+            padding: 18px 8px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            text-transform: uppercase;
+            color: var(--navy);
+            background: var(--bg);
+            box-sizing: border-box;
+        }
+        .code-input:focus { outline: none; border-color: var(--gold); background: white; }
+        .code-input::placeholder { color: #C8C8C8; font-weight: 500; letter-spacing: 10px; }
+
+        /* ---- Big action button, shared across screens ---- */
+        .big-btn {
+            display: block;
+            width: 100%;
+            margin-top: 14px;
+            padding: 18px;
+            font-size: 17px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            background: var(--gold);
+            color: var(--navy);
+            cursor: pointer;
+            transition: transform 0.05s, opacity 0.15s;
+        }
+        .big-btn:active:not(:disabled) { transform: scale(0.98); }
+        .big-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .big-btn.secondary { background: white; color: var(--text-muted); border: 1px solid var(--border); }
+
+        .error-msg {
+            margin-top: 16px;
+            padding: 12px 14px;
+            background: #FFEBEE;
+            color: var(--danger);
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+        .error-msg.visible { display: block; }
+
+        .hint {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 22px;
+            letter-spacing: 0.5px;
+        }
+        .legend {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* ---- Screen 2: team setup ---- */
+        .event-header {
+            text-align: center;
+            padding: 16px 12px;
+            background: var(--bg);
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        .event-header h2 { color: var(--navy); margin: 0 0 4px; font-size: 20px; }
+        .event-header .theme { font-size: 13px; color: var(--text-muted); letter-spacing: 0.5px; }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text);
+            font-weight: 600;
+            margin: 16px 0 6px;
+        }
+        .form-label:first-child { margin-top: 0; }
+        .text-input {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            background: white;
+            box-sizing: border-box;
+        }
+        .text-input:focus { outline: none; border-color: var(--gold); }
+        .member-stepper {
+            display: flex;
+            gap: 0;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            align-items: stretch;
+        }
+        .member-stepper button {
+            flex: 0 0 52px;
+            border: none;
+            background: var(--bg);
+            color: var(--navy);
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .member-stepper button:active:not(:disabled) { background: var(--gold); color: white; }
+        .member-stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+        .member-stepper .count {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--navy);
+            background: white;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ---- Screen 3: lobby ---- */
+        .lobby-status {
+            text-align: center;
+            padding: 28px 20px;
+            background: linear-gradient(135deg, #FDF9EE 0%, white 100%);
+            border: 2px solid var(--gold);
+            border-radius: 16px;
+            margin: 16px 0;
+        }
+        .lobby-status .you {
+            font-size: 13px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .lobby-status .team-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--navy);
+            margin-bottom: 4px;
+        }
+        .lobby-status .meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .teams-count {
+            text-align: center;
+            padding: 24px 16px;
+            background: var(--bg);
+            border-radius: 12px;
+            margin: 16px 0;
+        }
+        .teams-count .num {
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--navy);
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .teams-count .label {
+            font-size: 13px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+        .waiting {
+            text-align: center;
+            color: var(--text);
+            font-size: 15px;
+            padding: 12px;
+            font-style: italic;
+        }
+        .waiting::after {
+            content: '…';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40%     { content: '.'; }
+            60%     { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* ---- Screen 4: gameplay placeholder ---- */
+        .gameplay-placeholder {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .gameplay-placeholder h2 {
+            color: var(--navy);
+            font-size: 28px;
+            margin: 20px 0 12px;
+        }
+        .gameplay-placeholder .event-title-large {
+            font-size: 15px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .gameplay-placeholder .note {
+            margin-top: 32px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<!-- =================== SCREEN 1: CODE ENTRY =================== -->
+<div id="screen-1" class="join-card screen">
+    <div class="brand">
+        <h1 class="brand-mark">D.A.T.I<span>.</span></h1>
+        <div class="brand-sub">DON'T ASK THE INTERNET</div>
+    </div>
+    <p class="prompt">Enter the code from your host</p>
+    <input type="text" id="code-input" class="code-input" placeholder="XXX-XXX"
+           inputmode="text" autocapitalize="characters" autocomplete="off"
+           autocorrect="off" spellcheck="false" maxlength="7">
+    <button id="find-btn" class="big-btn" onclick="submitCode()" disabled>Find Game</button>
+    <div id="code-error" class="error-msg"></div>
+    <div class="hint">dati.elijah-sylar.com</div>
+    <div class="legend">Codes use A–Z and 2–9 (no 0, O, 1, I, L)</div>
+</div>
+
+<!-- =================== SCREEN 2: TEAM SETUP =================== -->
+<div id="screen-2" class="join-card screen">
+    <div class="event-header">
+        <h2 id="s2-event-title">—</h2>
+        <div class="theme" id="s2-theme">—</div>
+    </div>
+    <label class="form-label" for="team-name-input">Team name</label>
+    <input type="text" id="team-name-input" class="text-input"
+           placeholder="Your team name" maxlength="50" autocomplete="off">
+    <label class="form-label">How many players?</label>
+    <div class="member-stepper">
+        <button type="button" id="mc-minus" onclick="changeMemberCount(-1)" aria-label="Fewer">−</button>
+        <div class="count" id="mc-count">1</div>
+        <button type="button" id="mc-plus" onclick="changeMemberCount(1)" aria-label="More">+</button>
+    </div>
+    <button id="join-btn" class="big-btn" onclick="submitJoin()" style="margin-top:20px" disabled>Join Game</button>
+    <button class="big-btn secondary" onclick="backToScreen1()">Back</button>
+    <div id="join-error" class="error-msg"></div>
+</div>
+
+<!-- =================== SCREEN 3: LOBBY =================== -->
+<div id="screen-3" class="join-card screen">
+    <div class="event-header">
+        <h2 id="s3-event-title">—</h2>
+        <div class="theme" id="s3-theme">—</div>
+    </div>
+    <div class="lobby-status">
+        <div class="you">You're in as</div>
+        <div class="team-name" id="s3-team-name">—</div>
+        <div class="meta" id="s3-meta">— players</div>
+    </div>
+    <div class="teams-count">
+        <div class="num" id="s3-teams-num">—</div>
+        <div class="label">Teams Ready</div>
+    </div>
+    <div class="waiting">Waiting for the host to start</div>
+    <button class="big-btn secondary" onclick="leaveGame()" style="margin-top:20px">Leave Game</button>
+</div>
+
+<!-- =================== SCREEN 4: GAMEPLAY PLACEHOLDER =================== -->
+<!-- Phase 3 will replace this entirely with real gameplay UI. -->
+<div id="screen-4" class="join-card screen">
+    <div class="gameplay-placeholder">
+        <div class="event-title-large" id="s4-event-title">—</div>
+        <h2>Game starting</h2>
+        <div class="waiting">Get ready</div>
+        <div class="note">Phase 3 will replace this placeholder with the actual gameplay UI.</div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// =============================================================
+//  State
+// =============================================================
+const STORAGE_KEY = 'dati_player_session';
+const JOIN_ALPHABET = /[ABCDEFGHJKMNPQRSTUVWXYZ23456789]/g;
+
+let state = {
+    event: null,         // { event_id, title, theme_name, status, max_teams, max_players_per_team, current_team_count }
+    code: null,          // canonical 6-char
+    memberCount: 1,
+    socket: null,
+};
+
+// =============================================================
+//  Screen routing
+// =============================================================
+function showScreen(n) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(`screen-${n}`).classList.add('active');
+}
+
+function backToScreen1() {
+    if (state.socket) { try { state.socket.disconnect(); } catch(_){} state.socket = null; }
+    document.getElementById('join-error').classList.remove('visible');
+    showScreen(1);
+}
+
+// =============================================================
+//  Code formatting + Screen 1 handler
+// =============================================================
+function formatCode(raw) {
+    const cleaned = (String(raw || '').toUpperCase().match(JOIN_ALPHABET) || []).join('').slice(0, 6);
+    if (cleaned.length <= 3) return cleaned;
+    return cleaned.slice(0, 3) + '-' + cleaned.slice(3);
+}
+
+const codeInput  = document.getElementById('code-input');
+const findBtn    = document.getElementById('find-btn');
+const codeError  = document.getElementById('code-error');
+
+function rawCode() { return codeInput.value.replace('-', ''); }
+
+codeInput.addEventListener('input', () => {
+    codeInput.value = formatCode(codeInput.value);
+    findBtn.disabled = rawCode().length !== 6;
+    codeError.classList.remove('visible');
+});
+codeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !findBtn.disabled) submitCode();
+});
+
+async function submitCode() {
+    const code = rawCode();
+    if (code.length !== 6) return;
+    codeError.classList.remove('visible');
+    findBtn.disabled = true;
+    try {
+        const res = await fetch('/api/join/' + code);
+        if (res.status === 404) {
+            codeError.textContent = 'Event not found. Check the code and try again.';
+            codeError.classList.add('visible');
+            findBtn.disabled = false;
+            return;
+        }
+        if (!res.ok) {
+            codeError.textContent = 'Server error. Try again in a moment.';
+            codeError.classList.add('visible');
+            findBtn.disabled = false;
+            return;
+        }
+        state.event = await res.json();
+        state.code = code;
+        advanceToScreen2();
+    } catch (err) {
+        codeError.textContent = 'Network error. Check your connection.';
+        codeError.classList.add('visible');
+        findBtn.disabled = false;
+    }
+}
+
+// =============================================================
+//  Screen 2: team setup
+// =============================================================
+const teamNameInput = document.getElementById('team-name-input');
+const joinBtn       = document.getElementById('join-btn');
+const joinError     = document.getElementById('join-error');
+const mcCountEl     = document.getElementById('mc-count');
+const mcMinus       = document.getElementById('mc-minus');
+const mcPlus        = document.getElementById('mc-plus');
+
+function advanceToScreen2() {
+    document.getElementById('s2-event-title').textContent = state.event.title;
+    document.getElementById('s2-theme').textContent = state.event.theme_name;
+    // Reset form
+    teamNameInput.value = '';
+    state.memberCount = 1;
+    renderMemberCount();
+    updateJoinBtnEnabled();
+    joinError.classList.remove('visible');
+    showScreen(2);
+    // Pre-focus for fast entry
+    setTimeout(() => teamNameInput.focus(), 100);
+}
+
+function renderMemberCount() {
+    mcCountEl.textContent = state.memberCount;
+    mcMinus.disabled = state.memberCount <= 1;
+    mcPlus.disabled  = state.memberCount >= (state.event?.max_players_per_team || 5);
+}
+
+function changeMemberCount(delta) {
+    const max = state.event?.max_players_per_team || 5;
+    state.memberCount = Math.max(1, Math.min(max, state.memberCount + delta));
+    renderMemberCount();
+}
+
+function updateJoinBtnEnabled() {
+    joinBtn.disabled = teamNameInput.value.trim().length === 0;
+}
+
+teamNameInput.addEventListener('input', () => {
+    updateJoinBtnEnabled();
+    joinError.classList.remove('visible');
+});
+teamNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !joinBtn.disabled) submitJoin();
+});
+
+async function submitJoin() {
+    const teamName = teamNameInput.value.trim();
+    if (!teamName) return;
+    joinError.classList.remove('visible');
+    joinBtn.disabled = true;
+
+    // Connect guest socket
+    const socket = io('/player', { transports: ['websocket'], reconnection: false });
+    state.socket = socket;
+
+    const failAndRestore = (msg) => {
+        joinError.textContent = msg;
+        joinError.classList.add('visible');
+        joinBtn.disabled = false;
+        try { socket.disconnect(); } catch(_) {}
+        state.socket = null;
+    };
+
+    socket.on('connect_error', () => failAndRestore('Could not connect to server. Try again.'));
+
+    socket.on('connect', () => {
+        socket.emit('team:join', {
+            event_id: state.event.event_id,
+            team_name: teamName,
+            member_count: state.memberCount,
+        }, (ack) => {
+            if (!ack || ack.error) {
+                const code = ack?.error?.code || 'unknown';
+                const map = {
+                    duplicate_team_name: 'That team name is already taken for this event. Try another.',
+                    event_not_joinable:  'This event is no longer accepting teams.',
+                    event_not_found:     'Event no longer available.',
+                    invalid_input:       'Invalid team name.',
+                };
+                failAndRestore(map[code] || (ack?.error?.message) || 'Could not join. Try again.');
+                return;
+            }
+            // Persist session
+            const session = {
+                session_token: ack.session_token,
+                team_id: ack.team_id,
+                event_id: state.event.event_id,
+                team_name: teamName,
+                code: state.code,
+                member_count: state.memberCount,
+            };
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(session)); } catch(_) {}
+            mountLobbyWithSocket(socket, session, state.event);
+        });
+    });
+}
+
+// =============================================================
+//  Screen 3: lobby
+// =============================================================
+function mountLobbyWithSocket(socket, session, eventData) {
+    document.getElementById('s3-event-title').textContent = eventData.title;
+    document.getElementById('s3-theme').textContent = eventData.theme_name;
+    document.getElementById('s3-team-name').textContent = session.team_name;
+    document.getElementById('s3-meta').textContent =
+        `${session.member_count} player${session.member_count === 1 ? '' : 's'}`;
+    // Start count from API-known value; lobby:team_joined broadcast will refresh it.
+    document.getElementById('s3-teams-num').textContent = eventData.current_team_count || '—';
+
+    socket.on('lobby:team_joined', (p) => {
+        document.getElementById('s3-teams-num').textContent = p.total_teams;
+    });
+    socket.on('question:show', (p) => {
+        advanceToGameplay(p, eventData);
+    });
+    socket.on('game:ended', () => {
+        // Game ended before we saw any questions — shouldn't happen in normal flow,
+        // but if it does, clean up and return to Screen 1.
+        localStorage.removeItem(STORAGE_KEY);
+        if (state.socket) { try { state.socket.disconnect(); } catch(_){} state.socket = null; }
+        showScreen(1);
+    });
+    state.socket = socket;
+    showScreen(3);
+}
+
+async function leaveGame() {
+    if (!confirm('Leave this game? Your team will be removed and you\'ll need to rejoin with a new team name.')) return;
+    if (state.socket) { try { state.socket.disconnect(); } catch(_) {} state.socket = null; }
+    localStorage.removeItem(STORAGE_KEY);
+    showScreen(1);
+}
+
+// =============================================================
+//  Screen 4: gameplay placeholder
+//  TODO Phase 3: replace with real gameplay UI (question + options
+//  + timer + submit + lock/reveal handling).
+// =============================================================
+function advanceToGameplay(questionPayload, eventData) {
+    document.getElementById('s4-event-title').textContent = eventData.title;
+    showScreen(4);
+}
+
+// =============================================================
+//  Rejoin flow (on page load)
+//  1. Check localStorage. If absent, Screen 1.
+//  2. Verify event still published/live via /api/join/:code. If 404
+//     (includes completed/cancelled), silent clear + Screen 1.
+//  3. Connect to /player with session_token in handshake auth.
+//     - connect_error → silent clear + Screen 1
+//     - connect → emit team:rejoin, inspect ack
+//       - ack.error → silent clear + Screen 1
+//       - ack.status === 'ended' → silent clear + Screen 1
+//       - otherwise → Screen 3 (lobby) or Screen 4 (gameplay) based on state
+// =============================================================
+async function tryRejoin() {
+    let stored;
+    try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
+    catch (_) { stored = null; }
+    if (!stored || !stored.session_token || !stored.code) return false;
+
+    // Step 1: confirm event still joinable via public lookup
+    try {
+        const res = await fetch('/api/join/' + stored.code);
+        if (!res.ok) {
+            localStorage.removeItem(STORAGE_KEY);
+            return false;
+        }
+        state.event = await res.json();
+        state.code = stored.code;
+    } catch (_) {
+        // Network error — don't clear, let user retry by reloading
+        return false;
+    }
+
+    // Step 2: attach a socket using the stored session_token in handshake auth
+    return new Promise((resolve) => {
+        const socket = io('/player', {
+            auth: { session_token: stored.session_token },
+            transports: ['websocket'],
+            reconnection: false,
+        });
+        state.socket = socket;
+
+        let done = false;
+        const finishFail = () => {
+            if (done) return; done = true;
+            localStorage.removeItem(STORAGE_KEY);
+            try { socket.disconnect(); } catch(_) {}
+            state.socket = null;
+            resolve(false);
+        };
+
+        socket.on('connect_error', finishFail);
+
+        socket.on('connect', () => {
+            socket.emit('team:rejoin', {}, (ack) => {
+                if (done) return;
+                if (!ack || ack.error || ack.status === 'ended') { finishFail(); return; }
+                done = true;
+                // Decide screen based on event_state status
+                if (ack.status === 'lobby' || ack.status === 'intermission') {
+                    mountLobbyWithSocket(socket, stored, state.event);
+                } else {
+                    // question_active / question_locked / question_revealed
+                    document.getElementById('s4-event-title').textContent = state.event.title;
+                    // Wire ongoing listeners so we keep receiving updates
+                    socket.on('question:show', (p) => advanceToGameplay(p, state.event));
+                    socket.on('game:ended', () => {
+                        localStorage.removeItem(STORAGE_KEY);
+                        try { socket.disconnect(); } catch(_){}
+                        state.socket = null;
+                        showScreen(1);
+                    });
+                    showScreen(4);
+                }
+                resolve(true);
+            });
+        });
+    });
+}
+
+// =============================================================
+//  Boot
+// =============================================================
+(async function boot() {
+    // URL prefill: /join.html?code=XXX-XXX
+    const urlCode = new URL(location.href).searchParams.get('code');
+    if (urlCode) {
+        codeInput.value = formatCode(urlCode);
+        findBtn.disabled = rawCode().length !== 6;
+    }
+    const rejoined = await tryRejoin();
+    if (!rejoined) showScreen(1);
+})();
+</script>
+</body>
+</html>
