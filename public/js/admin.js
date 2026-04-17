@@ -276,15 +276,76 @@ async function loadEvents() {
                 <td>${e.start_time.slice(0, 5)}</td>
                 <td>${e.max_teams} teams / ${e.max_players_per_team} per</td>
                 <td><span class="badge badge-${e.status}">${e.status}</span></td>
-                <td class="actions">
-                    <a href="/play.html?theme_id=${e.theme_id}&title=${encodeURIComponent(e.title)}" target="_blank" class="btn btn-sm btn-gold">▶ Demo</a>
-                    <button class="btn btn-sm btn-outline" onclick="editEvent(${e.id})">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="cancelEvent(${e.id}, '${e.title}')">Cancel</button>
-                </td>
+                <td class="actions">${eventActionsFor(e)}</td>
             </tr>
         `).join('');
     } catch (err) {
         toast('Failed to load events', 'error');
+    }
+}
+
+// Render the Actions cell based on event.status. Live/completed/cancelled
+// events hide status buttons that don't apply, per the Phase 1 lifecycle:
+// draft↔published transitions are admin; live/completed are socket-owned.
+function eventActionsFor(e) {
+    const t = e.title.replace(/'/g, "\\'");
+    const demoLink = `<a href="/play.html?theme_id=${e.theme_id}&title=${encodeURIComponent(e.title)}" target="_blank" class="btn btn-sm btn-gold">▶ Demo</a>`;
+    const demoDisabled = `<button class="btn btn-sm btn-gold" disabled>▶ Demo</button>`;
+    const editBtn = `<button class="btn btn-sm btn-outline" onclick="editEvent(${e.id})">Edit</button>`;
+    const editDisabled = `<button class="btn btn-sm btn-outline" disabled>Edit</button>`;
+    const cancelBtn = `<button class="btn btn-sm btn-danger" onclick="cancelEvent(${e.id}, '${t}')">Cancel</button>`;
+    switch (e.status) {
+        case 'draft':
+            return `<button class="btn btn-sm btn-primary" onclick="publishEvent(${e.id})">Publish</button>${editBtn}${demoLink}${cancelBtn}`;
+        case 'published':
+            return `<button class="btn btn-sm btn-outline" onclick="unpublishEvent(${e.id}, '${t}')">Unpublish</button>${editBtn}${demoLink}${cancelBtn}`;
+        case 'live':
+            return `${editDisabled}${demoDisabled}`;
+        case 'completed':
+            return `<button class="btn btn-sm btn-outline" onclick="resetEventToDraft(${e.id}, '${t}')">Reset to Draft</button>${demoLink}`;
+        case 'cancelled':
+            return `<button class="btn btn-sm btn-outline" onclick="resetEventToDraft(${e.id}, '${t}')">Reset to Draft</button>`;
+        default:
+            return '';
+    }
+}
+
+async function patchEventStatus(id, status) {
+    return api(`/api/events/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+    });
+}
+
+async function publishEvent(id) {
+    try {
+        await patchEventStatus(id, 'published');
+        toast('Event published', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function unpublishEvent(id, title) {
+    if (!confirm(`Unpublish "${title}"? Hosts won't be able to pick it until republished.`)) return;
+    try {
+        await patchEventStatus(id, 'draft');
+        toast('Event unpublished', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function resetEventToDraft(id, title) {
+    if (!confirm(`Reset "${title}" to draft? This lets you re-host it but does NOT clear past team scores or answers.`)) return;
+    try {
+        await patchEventStatus(id, 'draft');
+        toast('Event reset to draft', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
     }
 }
 
@@ -303,7 +364,6 @@ function openEventModal(ev = null) {
     document.getElementById('ev-players').value = ev ? ev.max_players_per_team : 5;
     document.getElementById('ev-questions').value = ev ? ev.question_count : 10;
     document.getElementById('ev-timelimit').value = ev ? ev.time_limit_seconds : 30;
-    document.getElementById('ev-status').value = ev ? ev.status : 'draft';
     document.getElementById('event-modal').classList.add('active');
 }
 
@@ -323,8 +383,7 @@ async function saveEvent(e) {
         max_teams: parseInt(document.getElementById('ev-teams').value),
         max_players_per_team: parseInt(document.getElementById('ev-players').value),
         question_count: parseInt(document.getElementById('ev-questions').value),
-        time_limit_seconds: parseInt(document.getElementById('ev-timelimit').value),
-        status: document.getElementById('ev-status').value
+        time_limit_seconds: parseInt(document.getElementById('ev-timelimit').value)
     };
     try {
         if (id) {
@@ -344,7 +403,7 @@ async function saveEvent(e) {
 async function cancelEvent(id, title) {
     if (!confirm(`Cancel event "${title}"?`)) return;
     try {
-        await api(`/api/events/${id}`, { method: 'DELETE' });
+        await patchEventStatus(id, 'cancelled');
         toast('Event cancelled', 'success');
         loadEvents();
     } catch (err) {

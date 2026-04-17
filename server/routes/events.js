@@ -77,10 +77,12 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-// PUT /api/events/:id — update event
+// PUT /api/events/:id — update event (non-status fields only).
+// Status transitions go through PATCH /api/events/:id/status so validation
+// is centralized (live/completed are socket-layer owned).
 router.put('/:id', auth, async (req, res) => {
     try {
-        const allowed = ['theme_id', 'title', 'event_date', 'start_time', 'max_teams', 'max_players_per_team', 'question_count', 'time_limit_seconds', 'status'];
+        const allowed = ['theme_id', 'title', 'event_date', 'start_time', 'max_teams', 'max_players_per_team', 'question_count', 'time_limit_seconds'];
         const fields = [];
         const values = [];
 
@@ -104,7 +106,41 @@ router.put('/:id', auth, async (req, res) => {
     }
 });
 
-// DELETE /api/events/:id — cancel event
+// PATCH /api/events/:id/status — admin lifecycle transitions.
+// Allowed target states: draft | published | cancelled.
+// live and completed are set by the socket layer (host:start_event /
+// game:ended) and are never admin-settable. A currently-live event also
+// cannot be changed from admin at all — that's socket-layer territory.
+router.patch('/:id/status', auth, async (req, res) => {
+    try {
+        const { status } = req.body || {};
+        const allowedTargets = ['draft', 'published', 'cancelled'];
+        if (!allowedTargets.includes(status)) {
+            return res.status(400).json({
+                error: 'invalid_status',
+                message: `status must be one of: ${allowedTargets.join(', ')}`,
+            });
+        }
+        const [rows] = await pool.query('SELECT status FROM events WHERE id = ?', [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Event not found' });
+        if (rows[0].status === 'live') {
+            return res.status(409).json({
+                error: 'conflict',
+                message: 'Live events cannot be changed from admin. Use the host console.',
+            });
+        }
+        await pool.query('UPDATE events SET status = ? WHERE id = ?', [status, req.params.id]);
+        const [updated] = await pool.query('SELECT * FROM events WHERE id = ?', [req.params.id]);
+        res.json(updated[0]);
+    } catch (err) {
+        console.error('Patch event status error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// DELETE /api/events/:id — legacy cancel route. Kept for any external
+// callers; the admin UI now uses PATCH /status with status='cancelled'
+// so it flows through the same validation gate.
 router.delete('/:id', auth, async (req, res) => {
     try {
         await pool.query("UPDATE events SET status = 'cancelled' WHERE id = ?", [req.params.id]);
