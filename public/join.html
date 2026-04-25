@@ -1265,16 +1265,29 @@ function submitAnswer(letter) {
 // Wires inbound /player broadcasts that drive Screen 4. Idempotent —
 // safe to call once per socket connect.
 function wireGameplayListeners(socket, eventData) {
+    // [TEMP Phase 6 diagnostic — remove once stuck-state bug resolved]
+    // Catches every inbound event from the server. If question:show is
+    // missing here while the host/display advance, the socket is dead
+    // or out of the event room. If it appears here, the listener body
+    // (below) didn't run for some reason.
+    socket.onAny((evt, payload) => console.log('[gp recv]', evt, payload));
+    socket.on('disconnect', (reason) => console.log('[gp socket disconnect]', reason));
+    socket.on('connect_error', (err) => console.log('[gp socket connect_error]', err && err.message));
+
     socket.on('question:show', (p) => {
+        console.log('[gp] question:show listener fired, gp.state was', gp.state);
         renderQuestionShow(p, eventData);
     });
     socket.on('question:locked', () => {
+        console.log('[gp] question:locked listener fired, gp.state was', gp.state);
         renderQuestionLocked();
     });
     socket.on('question:revealed', (p) => {
+        console.log('[gp] question:revealed listener fired, gp.state was', gp.state, 'correct=', p && p.correct_option);
         renderQuestionRevealed(p.correct_option);
     });
     socket.on('game:ended', () => {
+        console.log('[gp] game:ended listener fired');
         localStorage.removeItem(STORAGE_KEY);
         try { socket.disconnect(); } catch (_) {}
         state.socket = null;
