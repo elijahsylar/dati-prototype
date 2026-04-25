@@ -248,6 +248,7 @@
         <h1>🎯 D.A.T.I. <span>Host</span></h1>
         <div style="display:flex;align-items:center;gap:14px">
             <span id="event-title-nav" style="font-size:13px;opacity:0.85"></span>
+            <button onclick="openDisplay()" title="Open the projector display in a new tab">Open Display</button>
             <button onclick="backToEventSelect()">Change Event</button>
             <button onclick="logout()">Logout</button>
         </div>
@@ -385,6 +386,16 @@ function backToEventSelect() {
     stopTimer();
     selectedEvent = null;
     showEventSelect();
+}
+
+// Phase 4 helper: opens /display.html for the currently selected event
+// in a new tab. Display page is public (no auth), keyed by ?event=<id>.
+function openDisplay() {
+    if (!selectedEvent || !selectedEvent.id) {
+        toast('Pick an event first', 'error');
+        return;
+    }
+    window.open(`/display.html?event=${selectedEvent.id}`, '_blank', 'noopener');
 }
 
 // --- event selection ---
