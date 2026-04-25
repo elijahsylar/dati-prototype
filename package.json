@@ -1,6 +1,6 @@
 {
   "name": "dati-prototype",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "D.A.T.I. [Don't Ask The Internet] — Trivia App Backend Prototype",
   "main": "server/index.js",
   "scripts": {

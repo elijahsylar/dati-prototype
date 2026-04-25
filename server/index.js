@@ -21,6 +21,7 @@ app.use('/api/questions',  require('./routes/questions'));
 app.use('/api/events',    require('./routes/events'));
 app.use('/api/join',      require('./routes/join'));
 app.use('/api/lifeline',  require('./routes/lifeline'));
+app.use('/api/display',   require('./routes/display'));
 
 // Health check
 app.get('/api/health', async (req, res) => {
