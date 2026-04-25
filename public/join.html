@@ -532,7 +532,10 @@ function writeSession(s) {
 //  lifeline_already_used, db_error.
 // =============================================================
 const LIFELINE_DURATION_SEC = 30;
-const LIFELINE_URL = 'https://html.duckduckgo.com/html/';
+// Lifeline iframe loads from our own /api/lifeline/search proxy.
+// Server-side proxy fetches DDG results and sanitizes them.
+// Direct embed of search engines blocked by CSP frame-ancestors 'self'.
+const LIFELINE_URL = '/api/lifeline/search';
 let lifelineTimerId = null;
 let lifelineActive = false;
 
