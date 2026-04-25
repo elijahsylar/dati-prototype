@@ -310,6 +310,86 @@
             margin: 0 0 14px;
         }
         .modal-card p:last-of-type { margin-bottom: 22px; }
+
+        /* ---- Lifeline button + overlay (Phase 5) ---- */
+        .lifeline-btn {
+            display: block;
+            width: 100%;
+            margin-top: 32px;
+            padding: 22px;
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 14px;
+            background: var(--gold);
+            color: var(--navy);
+            cursor: pointer;
+            min-height: 64px;
+            box-shadow: 0 4px 14px rgba(212, 168, 67, 0.35);
+            transition: transform 0.05s, opacity 0.15s;
+        }
+        .lifeline-btn:active:not(:disabled) { transform: scale(0.98); }
+        .lifeline-btn:disabled {
+            background: var(--border);
+            color: var(--text-muted);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .lifeline-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 200;
+            flex-direction: column;
+        }
+        .lifeline-overlay.visible { display: flex; }
+        .lifeline-overlay__chrome {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--navy);
+            color: white;
+            flex: 0 0 auto;
+        }
+        .lifeline-overlay__timer {
+            font-size: 32px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: var(--gold);
+            letter-spacing: 2px;
+        }
+        .lifeline-overlay__close {
+            min-width: 88px;
+            min-height: 44px;
+            padding: 10px 18px;
+            border: 2px solid white;
+            border-radius: 8px;
+            background: transparent;
+            color: white;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .lifeline-overlay__close:active { background: rgba(255,255,255,0.15); }
+        .lifeline-overlay__honor {
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            text-align: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            flex: 0 0 auto;
+        }
+        .lifeline-overlay__iframe {
+            flex: 1 1 auto;
+            width: 100%;
+            border: none;
+            background: white;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
 <body>
@@ -376,7 +456,9 @@
         <div class="event-title-large" id="s4-event-title">—</div>
         <h2>Game starting</h2>
         <div class="waiting">Get ready</div>
-        <div class="note">Phase 3 will replace this placeholder with the actual gameplay UI.</div>
+        <button id="lifeline-btn" class="lifeline-btn" onclick="useLifeline()">Use Lifeline</button>
+        <div class="note">One internet search per game. 30 seconds.</div>
+        <div id="lifeline-error" class="error-msg"></div>
     </div>
 </div>
 
@@ -387,6 +469,16 @@
         <p>We can't lock your access to the internet. The lifeline button will appear inside DATI when it's your turn to use it. Please use an honor system and refrain from asking the internet unless you've been given a pass.</p>
         <button class="big-btn" onclick="dismissHonorModal()">I understand</button>
     </div>
+</div>
+
+<!-- =================== LIFELINE OVERLAY (Phase 5) =================== -->
+<div id="lifeline-overlay" class="lifeline-overlay">
+    <div class="lifeline-overlay__chrome">
+        <div class="lifeline-overlay__timer" id="lifeline-timer">30</div>
+        <button class="lifeline-overlay__close" onclick="closeLifelineOverlay()" aria-label="Close">Close</button>
+    </div>
+    <div class="lifeline-overlay__honor">Use this 30 seconds for the current question only. The honor system is on you.</div>
+    <iframe id="lifeline-iframe" class="lifeline-overlay__iframe" title="Search" src="about:blank"></iframe>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -420,6 +512,122 @@ let state = {
     memberCount: 1,
     socket: null,
 };
+
+// =============================================================
+//  Session helpers (Phase 5)
+// =============================================================
+function readSession() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); }
+    catch (_) { return null; }
+}
+function writeSession(s) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (_) {}
+}
+
+// =============================================================
+//  Lifeline (Phase 5): one 30s search per team per game.
+//  Server contract (server/socket.js): emit team:use_lifeline,
+//  ack { accepted: true } | { error: { code, message } }.
+//  Possible error codes: not_authenticated, not_found,
+//  lifeline_already_used, db_error.
+// =============================================================
+const LIFELINE_DURATION_SEC = 30;
+// Lifeline iframe loads from our own /api/lifeline/search proxy.
+// Server-side proxy fetches DDG results and sanitizes them.
+// Direct embed of search engines blocked by CSP frame-ancestors 'self'.
+const LIFELINE_URL = '/api/lifeline/search';
+let lifelineTimerId = null;
+let lifelineActive = false;
+
+function syncLifelineButtonFromStorage() {
+    const btn = document.getElementById('lifeline-btn');
+    const session = readSession();
+    if (session && session.lifeline_used === true) {
+        btn.disabled = true;
+        btn.textContent = 'Lifeline Used';
+    } else {
+        btn.disabled = false;
+        btn.textContent = 'Use Lifeline';
+    }
+    document.getElementById('lifeline-error').classList.remove('visible');
+}
+
+function markLifelineUsedInStorage() {
+    const session = readSession();
+    if (!session) return;
+    session.lifeline_used = true;
+    writeSession(session);
+}
+
+function showLifelineError(msg) {
+    const el = document.getElementById('lifeline-error');
+    el.textContent = msg;
+    el.classList.add('visible');
+}
+
+function useLifeline() {
+    if (lifelineActive) return;
+    const btn = document.getElementById('lifeline-btn');
+    if (btn.disabled) return;
+    if (!state.socket) {
+        showLifelineError('Not connected. Refresh and try again.');
+        return;
+    }
+    btn.disabled = true; // prevent double-tap while ack is in flight
+    document.getElementById('lifeline-error').classList.remove('visible');
+
+    state.socket.emit('team:use_lifeline', undefined, (ack) => {
+        if (!ack || ack.error) {
+            const code = ack && ack.error && ack.error.code;
+            const map = {
+                lifeline_already_used: 'Your team has already used its lifeline.',
+                not_authenticated:     'Session expired. Refresh to continue.',
+                not_found:             'Team session no longer valid. Refresh to continue.',
+                db_error:              'Server error. Try again in a moment.',
+            };
+            const msg = map[code] || (ack && ack.error && ack.error.message) || 'Could not start lifeline.';
+            showLifelineError(msg);
+            if (code === 'lifeline_already_used') {
+                // Server is the source of truth: persist + lock button.
+                markLifelineUsedInStorage();
+                syncLifelineButtonFromStorage();
+            } else {
+                // Recoverable: let the user retry.
+                btn.disabled = false;
+            }
+            return;
+        }
+        openLifelineOverlay();
+    });
+}
+
+function openLifelineOverlay() {
+    lifelineActive = true;
+    const overlay = document.getElementById('lifeline-overlay');
+    const iframe  = document.getElementById('lifeline-iframe');
+    const timerEl = document.getElementById('lifeline-timer');
+    iframe.src = LIFELINE_URL;
+    let remaining = LIFELINE_DURATION_SEC;
+    timerEl.textContent = remaining;
+    overlay.classList.add('visible');
+    lifelineTimerId = setInterval(() => {
+        remaining -= 1;
+        timerEl.textContent = remaining;
+        if (remaining <= 0) closeLifelineOverlay();
+    }, 1000);
+}
+
+function closeLifelineOverlay() {
+    if (lifelineTimerId) { clearInterval(lifelineTimerId); lifelineTimerId = null; }
+    const overlay = document.getElementById('lifeline-overlay');
+    const iframe  = document.getElementById('lifeline-iframe');
+    overlay.classList.remove('visible');
+    // Unload iframe to free memory + stop any audio/video.
+    iframe.src = 'about:blank';
+    lifelineActive = false;
+    markLifelineUsedInStorage();
+    syncLifelineButtonFromStorage();
+}
 
 // =============================================================
 //  Honor system modal (phones only, once per session)
@@ -652,6 +860,7 @@ async function leaveGame() {
 function advanceToGameplay(questionPayload, eventData) {
     document.getElementById('s4-event-title').textContent = eventData.title;
     showScreen(4);
+    syncLifelineButtonFromStorage();
 }
 
 // =============================================================
@@ -726,6 +935,7 @@ async function tryRejoin() {
                         showScreen(1);
                     });
                     showScreen(4);
+                    syncLifelineButtonFromStorage();
                 }
                 resolve(true);
             });

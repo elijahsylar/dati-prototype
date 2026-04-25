@@ -319,6 +319,15 @@ let socket = null;
 let timerInterval = null;
 let timerDeadline = null;   // epoch ms when the question ends
 
+// --- toast (Phase 5; mirrors admin.js pattern, .toast styles already in admin.css) ---
+function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `toast show ${type}`;
+    setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
 // --- auth / nav ---
 async function login(ev) {
     ev.preventDefault();
@@ -452,7 +461,10 @@ function connectSocket() {
     socket.on('event:paused',      () => { setState('intermission'); stopTimer(); });
     socket.on('event:resumed',     () => { /* state returns to whatever's next */ });
     socket.on('game:ended',        onGameEnded);
-    socket.on('lifeline:used',     (p) => console.log('lifeline used by', p));
+    socket.on('lifeline:used',     (p) => {
+        console.log('lifeline used by', p);
+        toast(`Team ${p.team_name} used their lifeline`, 'success');
+    });
     socket.on('error',             onServerError);
 }
 
@@ -682,5 +694,6 @@ function escapeHtml(s) {
 if (token && currentUser) showEventSelect();
 else showLogin();
 </script>
+<div id="toast" class="toast"></div>
 </body>
 </html>
