@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DATI">
+    <link rel="apple-touch-icon" href="/icons/dati-icon-192.png">
+    <link rel="manifest" href="/manifest.json">
     <title>D.A.T.I. — Join Game</title>
     <link rel="stylesheet" href="/css/admin.css">
     <style>
@@ -152,6 +155,7 @@
             border-radius: 12px;
             overflow: hidden;
             align-items: stretch;
+            min-height: 48px;
         }
         .member-stepper button {
             flex: 0 0 52px;
@@ -262,6 +266,50 @@
             color: var(--text-muted);
             font-style: italic;
         }
+
+        /* ---- Touch optimizations (Phase 3) ---- */
+        body {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        input, textarea {
+            -webkit-user-select: text;
+            user-select: text;
+            -webkit-touch-callout: default;
+        }
+        button, .big-btn, .member-stepper button, .code-input, .text-input {
+            touch-action: manipulation;
+        }
+
+        /* ---- Honor system modal (Phase 3, phones only) ---- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 100;
+            padding: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px 24px;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+        }
+        .modal-card p {
+            color: var(--text);
+            font-size: 15px;
+            line-height: 1.5;
+            margin: 0 0 14px;
+        }
+        .modal-card p:last-of-type { margin-bottom: 22px; }
     </style>
 </head>
 <body>
@@ -332,8 +380,34 @@
     </div>
 </div>
 
+<!-- =================== HONOR SYSTEM MODAL (phones only) =================== -->
+<div id="honor-modal" class="modal-overlay">
+    <div class="modal-card">
+        <p>You've joined on mobile.</p>
+        <p>We can't lock your access to the internet. The lifeline button will appear inside DATI when it's your turn to use it. Please use an honor system and refrain from asking the internet unless you've been given a pass.</p>
+        <button class="big-btn" onclick="dismissHonorModal()">I understand</button>
+    </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// =============================================================
+//  Device detection (Phase 3)
+//  Returns 'ipad' | 'phone' | 'desktop'.
+//  Modern iPadOS Safari reports as Macintosh + touch, so we treat
+//  any touch-capable Mac UA at >=768px as an iPad.
+// =============================================================
+function detectDeviceType() {
+    const ua = navigator.userAgent;
+    const w = window.innerWidth;
+    const hasTouch = (navigator.maxTouchPoints || 0) > 1;
+    const isIPadUA = /iPad/.test(ua) || (/Macintosh/.test(ua) && hasTouch);
+    if (w >= 768 && isIPadUA) return 'ipad';
+    if (w < 768) return 'phone';
+    return 'desktop';
+}
+const DEVICE = detectDeviceType();
+
 // =============================================================
 //  State
 // =============================================================
@@ -346,6 +420,25 @@ let state = {
     memberCount: 1,
     socket: null,
 };
+
+// =============================================================
+//  Honor system modal (phones only, once per session)
+// =============================================================
+function maybeShowHonorModal() {
+    if (DEVICE !== 'phone') return;
+    let session = null;
+    try { session = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (_) {}
+    if (session && session.honor_acknowledged === true) return;
+    document.getElementById('honor-modal').classList.add('visible');
+}
+function dismissHonorModal() {
+    document.getElementById('honor-modal').classList.remove('visible');
+    let session = null;
+    try { session = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (_) {}
+    if (!session) return;
+    session.honor_acknowledged = true;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(session)); } catch (_) {}
+}
 
 // =============================================================
 //  Screen routing
@@ -541,6 +634,7 @@ function mountLobbyWithSocket(socket, session, eventData) {
     });
     state.socket = socket;
     showScreen(3);
+    maybeShowHonorModal();
 }
 
 async function leaveGame() {
