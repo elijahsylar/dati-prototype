@@ -1,6 +1,6 @@
 {
   "name": "dati-prototype",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "D.A.T.I. [Don't Ask The Internet] — Trivia App Backend Prototype",
   "main": "server/index.js",
   "scripts": {
@@ -15,9 +15,12 @@
     "dotenv": "^16.4.5",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.9.1"
+    "mysql2": "^3.9.1",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "nodemon": "^3.0.3",
+    "socket.io-client": "^4.8.3"
   }
 }

@@ -276,15 +276,131 @@ async function loadEvents() {
                 <td>${e.start_time.slice(0, 5)}</td>
                 <td>${e.max_teams} teams / ${e.max_players_per_team} per</td>
                 <td><span class="badge badge-${e.status}">${e.status}</span></td>
-                <td class="actions">
-                    <a href="/play.html?theme_id=${e.theme_id}&title=${encodeURIComponent(e.title)}" target="_blank" class="btn btn-sm btn-gold">▶ Demo</a>
-                    <button class="btn btn-sm btn-outline" onclick="editEvent(${e.id})">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="cancelEvent(${e.id}, '${e.title}')">Cancel</button>
-                </td>
+                <td class="actions">${eventActionsFor(e)}</td>
             </tr>
         `).join('');
     } catch (err) {
         toast('Failed to load events', 'error');
+    }
+}
+
+// Render the Actions cell based on event.status. Live/completed/cancelled
+// events hide status buttons that don't apply, per the Phase 1 lifecycle:
+// draft↔published transitions are admin; live/completed are socket-owned.
+// QR button shows only on published/live events that have a join_code.
+function eventActionsFor(e) {
+    const t = e.title.replace(/'/g, "\\'");
+    const demoLink = `<a href="/play.html?theme_id=${e.theme_id}&title=${encodeURIComponent(e.title)}" target="_blank" class="btn btn-sm btn-gold">▶ Demo</a>`;
+    const demoDisabled = `<button class="btn btn-sm btn-gold" disabled>▶ Demo</button>`;
+    const editBtn = `<button class="btn btn-sm btn-outline" onclick="editEvent(${e.id})">Edit</button>`;
+    const editDisabled = `<button class="btn btn-sm btn-outline" disabled>Edit</button>`;
+    const cancelBtn = `<button class="btn btn-sm btn-danger" onclick="cancelEvent(${e.id}, '${t}')">Cancel</button>`;
+    const qrBtn = (e.join_code && (e.status === 'published' || e.status === 'live'))
+        ? `<button class="btn btn-sm btn-primary" onclick="openQrModal(${e.id}, '${e.join_code}')">QR</button>`
+        : '';
+    switch (e.status) {
+        case 'draft':
+            return `<button class="btn btn-sm btn-primary" onclick="publishEvent(${e.id})">Publish</button>${editBtn}${demoLink}${cancelBtn}`;
+        case 'published':
+            return `<button class="btn btn-sm btn-outline" onclick="unpublishEvent(${e.id}, '${t}')">Unpublish</button>${editBtn}${qrBtn}${demoLink}${cancelBtn}`;
+        case 'live':
+            return `${editDisabled}${qrBtn}${demoDisabled}`;
+        case 'completed':
+            return `<button class="btn btn-sm btn-outline" onclick="resetEventToDraft(${e.id}, '${t}')">Reset to Draft</button>${demoLink}`;
+        case 'cancelled':
+            return `<button class="btn btn-sm btn-outline" onclick="resetEventToDraft(${e.id}, '${t}')">Reset to Draft</button>`;
+        default:
+            return '';
+    }
+}
+
+// ---- QR code modal ----
+let qrCurrentEventId = null;
+let qrObjectUrl = null;
+
+async function openQrModal(eventId, joinCode) {
+    qrCurrentEventId = eventId;
+    const displayCode = joinCode.slice(0, 3) + '-' + joinCode.slice(3);
+    document.getElementById('qr-code-display').textContent = displayCode;
+    try {
+        const res = await fetch(`/api/events/${eventId}/qr-code.png`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load QR image');
+        const blob = await res.blob();
+        if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+        qrObjectUrl = URL.createObjectURL(blob);
+        document.getElementById('qr-img').src = qrObjectUrl;
+        document.getElementById('qr-modal').classList.add('active');
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+function downloadQr() {
+    if (!qrObjectUrl) return;
+    const a = document.createElement('a');
+    a.href = qrObjectUrl;
+    a.download = `dati-qr-event-${qrCurrentEventId}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+async function openPrintCard() {
+    if (!qrCurrentEventId) return;
+    try {
+        const res = await fetch(`/api/events/${qrCurrentEventId}/print-card.html`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load print card');
+        const html = await res.text();
+        const w = window.open('', '_blank');
+        if (!w) { toast('Pop-up blocked — allow pop-ups to print', 'error'); return; }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function patchEventStatus(id, status) {
+    return api(`/api/events/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+    });
+}
+
+async function publishEvent(id) {
+    try {
+        await patchEventStatus(id, 'published');
+        toast('Event published', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function unpublishEvent(id, title) {
+    if (!confirm(`Unpublish "${title}"? Hosts won't be able to pick it until republished.`)) return;
+    try {
+        await patchEventStatus(id, 'draft');
+        toast('Event unpublished', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function resetEventToDraft(id, title) {
+    if (!confirm(`Reset "${title}" to draft? This lets you re-host it but does NOT clear past team scores or answers.`)) return;
+    try {
+        await patchEventStatus(id, 'draft');
+        toast('Event reset to draft', 'success');
+        loadEvents();
+    } catch (err) {
+        toast(err.message, 'error');
     }
 }
 
@@ -303,7 +419,6 @@ function openEventModal(ev = null) {
     document.getElementById('ev-players').value = ev ? ev.max_players_per_team : 5;
     document.getElementById('ev-questions').value = ev ? ev.question_count : 10;
     document.getElementById('ev-timelimit').value = ev ? ev.time_limit_seconds : 30;
-    document.getElementById('ev-status').value = ev ? ev.status : 'draft';
     document.getElementById('event-modal').classList.add('active');
 }
 
@@ -323,8 +438,7 @@ async function saveEvent(e) {
         max_teams: parseInt(document.getElementById('ev-teams').value),
         max_players_per_team: parseInt(document.getElementById('ev-players').value),
         question_count: parseInt(document.getElementById('ev-questions').value),
-        time_limit_seconds: parseInt(document.getElementById('ev-timelimit').value),
-        status: document.getElementById('ev-status').value
+        time_limit_seconds: parseInt(document.getElementById('ev-timelimit').value)
     };
     try {
         if (id) {
@@ -344,7 +458,7 @@ async function saveEvent(e) {
 async function cancelEvent(id, title) {
     if (!confirm(`Cancel event "${title}"?`)) return;
     try {
-        await api(`/api/events/${id}`, { method: 'DELETE' });
+        await patchEventStatus(id, 'cancelled');
         toast('Event cancelled', 'success');
         loadEvents();
     } catch (err) {
@@ -354,6 +468,11 @@ async function cancelEvent(id, title) {
 
 // ---- MODAL HELPERS ----
 function closeModal(id) {
+    // QR modal cleanup: revoke the object URL so the browser releases the blob.
+    if (id === 'qr-modal' && qrObjectUrl) {
+        URL.revokeObjectURL(qrObjectUrl);
+        qrObjectUrl = null;
+    }
     document.getElementById(id).classList.remove('active');
 }
 
