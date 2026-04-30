@@ -311,6 +311,165 @@
         }
         .modal-card p:last-of-type { margin-bottom: 22px; }
 
+        /* ---- Gameplay UI (Phase 6) ---- */
+        .gameplay { display: flex; flex-direction: column; gap: 14px; }
+        .gp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .gp-event-title {
+            font-size: 13px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .gp-qmeta {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            flex: 0 0 auto;
+        }
+        .gp-qnum {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--navy);
+            letter-spacing: 0.5px;
+        }
+        .gp-timer {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--navy);
+            font-variant-numeric: tabular-nums;
+            min-width: 32px;
+            text-align: right;
+        }
+        .gp-timer.warn { color: var(--danger); }
+        .gp-timer.locked { color: var(--text-muted); }
+
+        .gp-question {
+            font-family: Georgia, "Times New Roman", Times, serif;
+            font-size: 22px;
+            line-height: 1.3;
+            color: var(--text);
+            text-align: center;
+            padding: 8px 4px 4px;
+        }
+        .gp-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .gp-opt {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            min-height: 56px;
+            padding: 12px 14px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 16px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, opacity 0.25s, transform 0.05s;
+        }
+        .gp-opt:active:not(:disabled) { transform: scale(0.985); }
+        .gp-opt:disabled { cursor: not-allowed; }
+        .gp-opt-letter {
+            flex: 0 0 auto;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg);
+            color: var(--navy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 16px;
+        }
+        .gp-opt-body {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        /* State variants */
+        .gp-opt.submitting {
+            opacity: 0.7;
+            border-color: var(--gold);
+        }
+        .gp-opt.selected {
+            background: #FDF9EE;
+            border-color: var(--gold);
+            border-width: 3px;
+        }
+        .gp-opt.selected .gp-opt-letter {
+            background: var(--gold);
+            color: var(--navy);
+        }
+        .gp-opt.dimmed { opacity: 0.40; }
+        .gp-opt.correct {
+            background: var(--success);
+            border-color: var(--success);
+            color: white;
+            opacity: 1;
+        }
+        .gp-opt.correct .gp-opt-letter {
+            background: white;
+            color: var(--success);
+        }
+        .gp-opt.wrong {
+            background: var(--danger);
+            border-color: var(--danger);
+            color: white;
+            opacity: 1;
+        }
+        .gp-opt.wrong .gp-opt-letter {
+            background: white;
+            color: var(--danger);
+        }
+
+        .gp-status {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 10px 12px;
+            background: var(--bg);
+            border-radius: 10px;
+            letter-spacing: 0.3px;
+        }
+        .gp-status.active     { background: #E8F4EA; color: var(--success); }
+        .gp-status.submitted  { background: #FDF9EE; color: var(--navy); }
+        .gp-status.locked     { background: #FFF4D6; color: var(--warning); }
+        .gp-status.correct    { background: var(--success); color: white; }
+        .gp-status.wrong      { background: var(--danger);  color: white; }
+        .gp-status.catching   { background: var(--bg); color: var(--text-muted); font-style: italic; }
+
+        /* iPad: 2x2 grid + bigger tap targets */
+        @media (min-width: 768px) {
+            .gp-question { font-size: 28px; padding: 12px 4px; }
+            .gp-options {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: 1fr 1fr;
+                gap: 14px;
+            }
+            .gp-opt { min-height: 64px; font-size: 17px; }
+            .gp-opt-letter { width: 42px; height: 42px; font-size: 18px; }
+        }
+
         /* ---- Lifeline button + overlay (Phase 5) ---- */
         .lifeline-btn {
             display: block;
@@ -452,10 +611,38 @@
 <!-- =================== SCREEN 4: GAMEPLAY PLACEHOLDER =================== -->
 <!-- Phase 3 will replace this entirely with real gameplay UI. -->
 <div id="screen-4" class="join-card screen">
-    <div class="gameplay-placeholder">
-        <div class="event-title-large" id="s4-event-title">—</div>
-        <h2>Game starting</h2>
-        <div class="waiting">Get ready</div>
+    <div class="gameplay">
+        <div class="gp-header">
+            <div class="gp-event-title" id="s4-event-title">.</div>
+            <div class="gp-qmeta">
+                <span class="gp-qnum" id="s4-qnum">.</span>
+                <span class="gp-timer" id="s4-timer">.</span>
+            </div>
+        </div>
+
+        <div class="gp-question" id="s4-qtext">Get ready.</div>
+
+        <div class="gp-options" id="s4-options">
+            <button class="gp-opt" data-letter="A" type="button" onclick="submitAnswer('A')" disabled>
+                <span class="gp-opt-letter">A</span>
+                <span class="gp-opt-body" id="s4-opt-A">.</span>
+            </button>
+            <button class="gp-opt" data-letter="B" type="button" onclick="submitAnswer('B')" disabled>
+                <span class="gp-opt-letter">B</span>
+                <span class="gp-opt-body" id="s4-opt-B">.</span>
+            </button>
+            <button class="gp-opt" data-letter="C" type="button" onclick="submitAnswer('C')" disabled>
+                <span class="gp-opt-letter">C</span>
+                <span class="gp-opt-body" id="s4-opt-C">.</span>
+            </button>
+            <button class="gp-opt" data-letter="D" type="button" onclick="submitAnswer('D')" disabled>
+                <span class="gp-opt-letter">D</span>
+                <span class="gp-opt-body" id="s4-opt-D">.</span>
+            </button>
+        </div>
+
+        <div class="gp-status" id="s4-status">Waiting for the host to start.</div>
+
         <button id="lifeline-btn" class="lifeline-btn" onclick="useLifeline()">Use Lifeline</button>
         <div class="note">One internet search per game. 30 seconds.</div>
         <div id="lifeline-error" class="error-msg"></div>
@@ -830,16 +1017,9 @@ function mountLobbyWithSocket(socket, session, eventData) {
     socket.on('lobby:team_joined', (p) => {
         document.getElementById('s3-teams-num').textContent = p.total_teams;
     });
-    socket.on('question:show', (p) => {
-        advanceToGameplay(p, eventData);
-    });
-    socket.on('game:ended', () => {
-        // Game ended before we saw any questions — shouldn't happen in normal flow,
-        // but if it does, clean up and return to Screen 1.
-        localStorage.removeItem(STORAGE_KEY);
-        if (state.socket) { try { state.socket.disconnect(); } catch(_){} state.socket = null; }
-        showScreen(1);
-    });
+    // Phase 6: gameplay listeners are wired here so they're ready before
+    // the host starts. question:show transitions Screen 3 → Screen 4.
+    wireGameplayListeners(socket, eventData);
     state.socket = socket;
     showScreen(3);
     maybeShowHonorModal();
@@ -853,14 +1033,321 @@ async function leaveGame() {
 }
 
 // =============================================================
-//  Screen 4: gameplay placeholder
-//  TODO Phase 3: replace with real gameplay UI (question + options
-//  + timer + submit + lock/reveal handling).
+//  Screen 4: gameplay (Phase 6)
+//  Per-question state machine + answer submission.
+//  Server contract (server/socket.js):
+//    emit team:submit_answer { question_id, selected_option, response_time_ms }
+//    ack { accepted: true, points_earned, is_correct } | { error: { code, message } }
+//    Error codes: not_authenticated, invalid_input, invalid_timing,
+//                 invalid_state, wrong_question, unknown_question,
+//                 already_answered, db_error
+//  Reveal correctness ONLY on question:revealed broadcast (synced with
+//  the projector). is_correct in the ack is intentionally unused.
 // =============================================================
-function advanceToGameplay(questionPayload, eventData) {
-    document.getElementById('s4-event-title').textContent = eventData.title;
+const gp = {
+    questionId:        null,
+    state:             'idle',  // idle|active|submitting|submitted|locked|revealed|catching
+    selectedOption:    null,
+    correctOption:     null,
+    questionStartedMs: null,    // ms epoch
+    timeLimitMs:       null,
+    timerId:           null,
+    timerEnd:          null,
+};
+
+function $s(id) { return document.getElementById(id); }
+
+function setStatus(text, cls) {
+    const el = $s('s4-status');
+    el.textContent = text;
+    el.className = 'gp-status' + (cls ? ' ' + cls : '');
+}
+
+function setTimerDisplay(secs) {
+    $s('s4-timer').textContent = secs == null ? '' : String(secs);
+}
+
+function startGameplayTimer(endMs) {
+    stopGameplayTimer();
+    gp.timerEnd = endMs;
+    $s('s4-timer').classList.remove('warn', 'locked');
+    tickGameplayTimer();
+    gp.timerId = setInterval(tickGameplayTimer, 250);
+}
+function tickGameplayTimer() {
+    const remainingMs = Math.max(0, gp.timerEnd - Date.now());
+    const secs = Math.ceil(remainingMs / 1000);
+    setTimerDisplay(secs);
+    $s('s4-timer').classList.toggle('warn', secs <= 5 && secs > 0);
+    if (remainingMs <= 0) {
+        stopGameplayTimer();
+        // Pre-disable buttons (player UX) but keep visual state pending
+        // server's question:locked broadcast.
+        if (gp.state === 'active' || gp.state === 'submitting') {
+            disableAllOptionButtons();
+        }
+    }
+}
+function stopGameplayTimer() {
+    if (gp.timerId) { clearInterval(gp.timerId); gp.timerId = null; }
+}
+
+function clearOptionStates() {
+    document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+        el.classList.remove('submitting', 'selected', 'dimmed', 'correct', 'wrong');
+    });
+}
+function disableAllOptionButtons() {
+    document.querySelectorAll('#s4-options .gp-opt').forEach(el => { el.disabled = true; });
+}
+function enableAllOptionButtons() {
+    document.querySelectorAll('#s4-options .gp-opt').forEach(el => { el.disabled = false; });
+}
+
+function renderQuestionShow(p, eventData) {
+    // p: { question_id, question_text, options:{A,B,C,D}, difficulty,
+    //      time_limit_seconds, question_number, total_questions, [started_at] }
+    if (eventData) $s('s4-event-title').textContent = eventData.title;
+    $s('s4-qnum').textContent  = `Q ${p.question_number}/${p.total_questions}`;
+    $s('s4-qtext').textContent = p.question_text || '';
+    ['A','B','C','D'].forEach(L => {
+        $s('s4-opt-' + L).textContent = (p.options && p.options[L]) || '';
+    });
+
+    gp.questionId        = p.question_id;
+    gp.selectedOption    = null;
+    gp.correctOption     = null;
+    gp.questionStartedMs = p.started_at ? new Date(p.started_at).getTime() : Date.now();
+    gp.timeLimitMs       = (p.time_limit_seconds || 0) * 1000;
+
+    clearOptionStates();
+    enableAllOptionButtons();
+    gp.state = 'active';
+
+    startGameplayTimer(gp.questionStartedMs + gp.timeLimitMs);
+    setStatus('Tap your answer.', 'active');
     showScreen(4);
-    syncLifelineButtonFromStorage();
+}
+
+function renderQuestionLocked() {
+    stopGameplayTimer();
+    setTimerDisplay(0);
+    $s('s4-timer').classList.add('locked');
+    disableAllOptionButtons();
+    if (gp.state === 'submitted') {
+        setStatus('Answer locked in.', 'submitted');
+    } else {
+        setStatus('Time is up.', 'locked');
+    }
+    gp.state = 'locked';
+}
+
+function renderQuestionRevealed(correctLetter) {
+    gp.correctOption = correctLetter;
+    stopGameplayTimer();
+    disableAllOptionButtons();
+    document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+        el.classList.remove('submitting', 'selected', 'dimmed');
+        if (el.dataset.letter === correctLetter) {
+            el.classList.add('correct');
+        } else if (gp.selectedOption && el.dataset.letter === gp.selectedOption) {
+            el.classList.add('wrong');
+        } else {
+            el.classList.add('dimmed');
+        }
+    });
+    if (gp.selectedOption == null) {
+        // Either we never submitted (timed out) OR we joined mid-question
+        // without a submission record. Either way, no win/loss verdict.
+        setStatus(`Correct answer was ${correctLetter}.`, 'locked');
+    } else if (gp.selectedOption === correctLetter) {
+        setStatus('Correct.', 'correct');
+    } else {
+        setStatus(`Wrong. Correct answer was ${correctLetter}.`, 'wrong');
+    }
+    gp.state = 'revealed';
+}
+
+function renderCatchingUp(currentQuestion, correctOption) {
+    // Late-join after a question has been revealed. Render the question
+    // text + options and highlight the correct one, but no win/loss
+    // verdict (we have no submission record). Wait for next question:show.
+    $s('s4-qnum').textContent  = `Q ${currentQuestion.question_number}/${currentQuestion.total_questions}`;
+    $s('s4-qtext').textContent = currentQuestion.question_text || '';
+    ['A','B','C','D'].forEach(L => {
+        $s('s4-opt-' + L).textContent = (currentQuestion.options && currentQuestion.options[L]) || '';
+    });
+    gp.questionId      = currentQuestion.question_id;
+    gp.selectedOption  = null;
+    gp.correctOption   = correctOption;
+    clearOptionStates();
+    disableAllOptionButtons();
+    setTimerDisplay(0);
+    $s('s4-timer').classList.add('locked');
+    if (correctOption) {
+        document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+            if (el.dataset.letter === correctOption) el.classList.add('correct');
+            else el.classList.add('dimmed');
+        });
+    }
+    setStatus('Catching up.', 'catching');
+    gp.state = 'catching';
+}
+
+function submitAnswer(letter) {
+    if (gp.state !== 'active') return;
+    if (!state.socket) return;
+    if (gp.questionId == null) return;
+
+    gp.selectedOption = letter;
+    gp.state = 'submitting';
+    const responseTimeMs = Math.max(0, Date.now() - gp.questionStartedMs);
+
+    // Visually mark the chosen one immediately + dim others.
+    document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+        if (el.dataset.letter === letter) {
+            el.classList.add('submitting', 'selected');
+        } else {
+            el.classList.add('dimmed');
+        }
+    });
+    disableAllOptionButtons();
+    setStatus('Sending answer.', 'submitted');
+
+    state.socket.emit('team:submit_answer', {
+        question_id:      gp.questionId,
+        selected_option:  letter,
+        response_time_ms: responseTimeMs,
+    }, (ack) => {
+        if (gp.state !== 'submitting') return; // ignore stale ack (next question already moved on)
+        if (!ack || ack.error) {
+            const code = ack && ack.error && ack.error.code;
+            const map = {
+                already_answered:  'Your team already answered this question.',
+                invalid_state:     'Question is no longer accepting answers.',
+                wrong_question:    'That question is no longer current.',
+                not_authenticated: 'Session expired. Refresh to continue.',
+                invalid_timing:    'Submission was too late.',
+            };
+            const msg = map[code] || (ack && ack.error && ack.error.message) || 'Could not submit. Try again.';
+            // Server rejected. Treat as locked-without-submission visually
+            // (server is the source of truth; the option is gone).
+            gp.selectedOption = null;
+            document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+                el.classList.remove('submitting', 'selected', 'dimmed');
+            });
+            disableAllOptionButtons();
+            stopGameplayTimer();
+            setTimerDisplay(0);
+            $s('s4-timer').classList.add('locked');
+            setStatus(msg, 'locked');
+            gp.state = 'locked';
+            return;
+        }
+        // Accepted. Persist submission so reload/reconnect mid-question
+        // remembers our pick when applying the snapshot.
+        const session = readSession();
+        if (session) {
+            session.last_submission = { question_id: gp.questionId, selected_option: letter };
+            writeSession(session);
+        }
+        document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+            el.classList.remove('submitting');
+        });
+        setStatus('Answer locked in.', 'submitted');
+        gp.state = 'submitted';
+        // Note: ack.is_correct intentionally NOT used here — we wait for
+        // the question:revealed broadcast so the player's reveal moment
+        // is synchronized with the projector and other tablets.
+    });
+}
+
+// Wires inbound /player broadcasts that drive Screen 4. Idempotent —
+// safe to call once per socket connect.
+function wireGameplayListeners(socket, eventData) {
+    // [TEMP Phase 6 diagnostic — remove once stuck-state bug resolved]
+    // Catches every inbound event from the server. If question:show is
+    // missing here while the host/display advance, the socket is dead
+    // or out of the event room. If it appears here, the listener body
+    // (below) didn't run for some reason.
+    socket.onAny((evt, payload) => console.log('[gp recv]', evt, payload));
+    socket.on('disconnect', (reason) => console.log('[gp socket disconnect]', reason));
+    socket.on('connect_error', (err) => console.log('[gp socket connect_error]', err && err.message));
+
+    socket.on('question:show', (p) => {
+        console.log('[gp] question:show listener fired, gp.state was', gp.state);
+        renderQuestionShow(p, eventData);
+    });
+    socket.on('question:locked', () => {
+        console.log('[gp] question:locked listener fired, gp.state was', gp.state);
+        renderQuestionLocked();
+    });
+    socket.on('question:revealed', (p) => {
+        console.log('[gp] question:revealed listener fired, gp.state was', gp.state, 'correct=', p && p.correct_option);
+        renderQuestionRevealed(p.correct_option);
+    });
+    socket.on('game:ended', () => {
+        console.log('[gp] game:ended listener fired');
+        localStorage.removeItem(STORAGE_KEY);
+        try { socket.disconnect(); } catch (_) {}
+        state.socket = null;
+        stopGameplayTimer();
+        showScreen(1);
+    });
+}
+
+// Apply a /api/display/:event_id/snapshot response onto Screen 4.
+// Used on rejoin to recover state for late-joining players.
+function applyGameplaySnapshot(snap) {
+    if (!snap || !snap.current_question) {
+        // No current question — nothing to render gameplay-wise. Caller
+        // typically already routed to lobby in this case.
+        return;
+    }
+    const q = snap.current_question;
+    // Did WE submit for this question?
+    const session = readSession();
+    const lastSub = session && session.last_submission;
+    const ourPick = (lastSub && lastSub.question_id === q.question_id) ? lastSub.selected_option : null;
+
+    if (q.state === 'active') {
+        // Render as if we just got a question:show. Server-authoritative
+        // started_at gives us the right remaining time.
+        renderQuestionShow(q);
+        if (ourPick) {
+            // We already submitted before reload. Reflect that.
+            gp.selectedOption = ourPick;
+            gp.state = 'submitted';
+            disableAllOptionButtons();
+            document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+                if (el.dataset.letter === ourPick) el.classList.add('selected');
+                else el.classList.add('dimmed');
+            });
+            setStatus('Answer locked in.', 'submitted');
+        }
+    } else if (q.state === 'locked') {
+        // Render question, mark locked, restore our pick if any.
+        renderQuestionShow(q);
+        if (ourPick) gp.selectedOption = ourPick;
+        renderQuestionLocked();
+        if (ourPick) {
+            document.querySelectorAll('#s4-options .gp-opt').forEach(el => {
+                if (el.dataset.letter === ourPick) el.classList.add('selected');
+                else el.classList.add('dimmed');
+            });
+        }
+    } else if (q.state === 'revealed') {
+        if (ourPick) {
+            // Same as a normal reveal flow: render question, set our pick,
+            // then call renderQuestionRevealed for green/red.
+            renderQuestionShow(q);
+            gp.selectedOption = ourPick;
+            renderQuestionRevealed(snap.correct_option);
+        } else {
+            // Late-join, no submission record. Catching up.
+            renderCatchingUp(q, snap.correct_option);
+        }
+    }
 }
 
 // =============================================================
@@ -926,16 +1413,17 @@ async function tryRejoin() {
                 } else {
                     // question_active / question_locked / question_revealed
                     document.getElementById('s4-event-title').textContent = state.event.title;
-                    // Wire ongoing listeners so we keep receiving updates
-                    socket.on('question:show', (p) => advanceToGameplay(p, state.event));
-                    socket.on('game:ended', () => {
-                        localStorage.removeItem(STORAGE_KEY);
-                        try { socket.disconnect(); } catch(_){}
-                        state.socket = null;
-                        showScreen(1);
-                    });
+                    wireGameplayListeners(socket, state.event);
+                    state.socket = socket;
                     showScreen(4);
                     syncLifelineButtonFromStorage();
+                    // Phase 6: rehydrate current question state from the
+                    // public display snapshot (closes the broadcast-only
+                    // race for late-joining players).
+                    fetch(`/api/display/${state.event.event_id}/snapshot`, { cache: 'no-store' })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(snap => { if (snap) applyGameplaySnapshot(snap); })
+                        .catch(err => console.warn('gameplay snapshot fetch failed:', err));
                 }
                 resolve(true);
             });
