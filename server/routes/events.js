@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const pool = require('../db');
 const auth = require('../middleware/auth');
+const socketModule = require('../socket');
 const router = express.Router();
 
 // 31-char alphabet: A-Z minus I/L/O, 0-9 minus 0/1. Chosen to avoid
@@ -181,10 +182,36 @@ router.patch('/:id/status', auth, async (req, res) => {
                 });
             }
         } else if (goingToDraft) {
-            await pool.query(
-                'UPDATE events SET status = ?, join_code = NULL WHERE id = ?',
-                [status, req.params.id]
-            );
+            // Reset to Draft: wipe per-run state so a re-publish starts
+            // clean. Without this, old teams + answers + event_state
+            // rows from the previous run would survive into the next
+            // run and pollute roster + leaderboard.
+            const conn = await pool.getConnection();
+            try {
+                await conn.beginTransaction();
+                await conn.query(
+                    'DELETE FROM team_answers WHERE team_id IN (SELECT id FROM teams WHERE event_id = ?)',
+                    [req.params.id]
+                );
+                await conn.query('DELETE FROM teams WHERE event_id = ?', [req.params.id]);
+                await conn.query('DELETE FROM event_state WHERE event_id = ?', [req.params.id]);
+                await conn.query(
+                    'UPDATE events SET status = ?, join_code = NULL WHERE id = ?',
+                    [status, req.params.id]
+                );
+                await conn.commit();
+            } catch (txErr) {
+                try { await conn.rollback(); } catch (_) {}
+                conn.release();
+                console.error('Reset to Draft cleanup failed:', txErr);
+                return res.status(500).json({ error: 'Server error' });
+            }
+            conn.release();
+            // Re-broadcast empty leaderboard so any connected /host or
+            // /display sockets re-render the empty state immediately.
+            if (socketModule.broadcast) {
+                socketModule.broadcast(Number(req.params.id), 'scores:update', { scores: [] });
+            }
         } else {
             await pool.query('UPDATE events SET status = ? WHERE id = ?', [status, req.params.id]);
         }
