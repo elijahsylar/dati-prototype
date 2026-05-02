@@ -26,6 +26,12 @@ function computePoints(responseTimeMs, isCorrect, difficulty) {
     return Math.round(base * mult);
 }
 
+// Module-scoped reference populated when attachSocketIO runs, so HTTP
+// routes can emit to event rooms without taking a dependency on io
+// itself. No new socket event names or payload shapes — only an
+// additional caller for existing broadcasts.
+let broadcastFn = null;
+
 function attachSocketIO(httpServer) {
     const io = new Server(httpServer);
     const hostNs    = io.of('/host');
@@ -44,6 +50,7 @@ function attachSocketIO(httpServer) {
         playerNs .in(room).emit(eventName, payload);
         displayNs.in(room).emit(eventName, payload);
     }
+    broadcastFn = broadcastToEvent;
 
     function emitError(socket, code, message) {
         socket.emit('error', { code, message });
@@ -601,3 +608,6 @@ function attachSocketIO(httpServer) {
 }
 
 module.exports = attachSocketIO;
+module.exports.broadcast = (eventId, eventName, payload) => {
+    if (broadcastFn) broadcastFn(eventId, eventName, payload);
+};
